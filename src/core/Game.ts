@@ -10,7 +10,10 @@ import { buildEnvironment } from "../world/Sky";
 import { buildTerrain, heightAt } from "../world/Terrain";
 import { scatterVegetation } from "../world/Vegetation";
 import { PlayerController } from "../player/PlayerController";
-import { buildHud } from "../ui/hud";
+import { Hud, type ExtractionPromptState } from "../ui/hud";
+import { ExtractionZone } from "../gameplay/ExtractionZone";
+
+const EXTRACT_HOLD_SECONDS = 3;
 
 export class Game {
   private engine: Engine;
@@ -31,15 +34,56 @@ export class Game {
 
     const spawnX = 0;
     const spawnZ = 0;
+    // Babylon's camera stores the Vector3 it's given by reference, so keep this
+    // pristine for redeploy and hand the camera its own clone to mutate.
     const spawn = new Vector3(spawnX, heightAt(spawnX, spawnZ) + 1.75, spawnZ);
-    const player = new PlayerController(this.scene, this.engine, canvas, spawn);
+    const player = new PlayerController(this.scene, this.engine, canvas, spawn.clone());
     this.scene.activeCamera = player.camera;
 
     this.setupPostProcessing(player);
-    buildHud(hudRoot, player);
+
+    const zoneX = 90;
+    const zoneZ = -70;
+    const zone = new ExtractionZone(this.scene, new Vector3(zoneX, heightAt(zoneX, zoneZ), zoneZ));
+
+    let extractionProgress = 0;
+    let extracted = false;
+
+    const redeploy = () => {
+      player.teleport(spawn);
+      player.setInputEnabled(true);
+      extracted = false;
+      extractionProgress = 0;
+      hud.hideExtractionComplete();
+    };
+
+    const hud = new Hud(hudRoot, player, redeploy);
+
+    this.scene.onBeforeRenderObservable.add(() => {
+      const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.1);
+      zone.update(dt);
+      hud.setStamina(player.getStamina());
+
+      if (extracted) return;
+
+      const inside = zone.isInside(player.camera.position);
+      const holding = inside && player.isKeyDown("KeyE");
+
+      extractionProgress = Math.max(0, Math.min(1, extractionProgress + (holding ? dt / EXTRACT_HOLD_SECONDS : -dt)));
+
+      const state: ExtractionPromptState = !inside ? "hidden" : holding ? "extracting" : "available";
+      hud.setExtractionPrompt(state, extractionProgress);
+
+      if (extractionProgress >= 1) {
+        extracted = true;
+        player.setInputEnabled(false);
+        hud.showExtractionComplete();
+        document.exitPointerLock();
+      }
+    });
 
     if (import.meta.env.DEV) {
-      (window as unknown as Record<string, unknown>).__debug = { scene: this.scene, engine: this.engine, player };
+      (window as unknown as Record<string, unknown>).__debug = { scene: this.scene, engine: this.engine, player, zone };
     }
 
     this.engine.runRenderLoop(() => this.scene.render());
