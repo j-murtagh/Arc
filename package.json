@@ -1,0 +1,22 @@
+{
+  "name": "arc",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^9.15.0",
+    "@babylonjs/loaders": "^9.15.0",
+    "@babylonjs/materials": "^9.15.0",
+    "@babylonjs/post-processes": "^9.15.0"
+  }
+}
