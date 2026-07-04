@@ -8,6 +8,8 @@ export class Hud {
   private extractProgress: HTMLDivElement;
   private extractLabel: HTMLDivElement;
   private completeOverlay: HTMLDivElement;
+  private completeSummary: HTMLDivElement;
+  private lootCount: HTMLDivElement;
   private lockPrompt: HTMLDivElement;
   private isPointerLocked = false;
   private extractionComplete = false;
@@ -152,12 +154,38 @@ export class Hud {
         .redeploy-button:hover {
           background: rgba(255, 255, 255, 0.18);
         }
+        .loot-count {
+          position: absolute;
+          top: 24px;
+          right: 24px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          border-radius: 4px;
+          background: rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          font-size: 15px;
+          letter-spacing: 0.03em;
+        }
+        .loot-count .gem {
+          color: #ffb827;
+        }
+        .complete-overlay .summary {
+          font-size: 15px;
+          opacity: 0.85;
+          letter-spacing: 0.03em;
+        }
+        .complete-overlay .summary .gained {
+          color: #ffb827;
+        }
       </style>
       <div class="crosshair"></div>
       <div class="stat-bars">
         <div class="bar-track"><div class="bar-fill health"></div></div>
         <div class="bar-track"><div class="bar-fill stamina"></div></div>
       </div>
+      <div class="loot-count"><span class="gem">&#9670;</span><span id="loot-count-value">0</span></div>
       <div class="extract-prompt" id="extract-prompt">
         <div class="extract-label" id="extract-label">Hold [E] to Extract</div>
         <div class="extract-track"><div class="extract-fill" id="extract-fill"></div></div>
@@ -168,6 +196,7 @@ export class Hud {
       </div>
       <div class="complete-overlay" id="complete-overlay">
         <h1>Extracted</h1>
+        <div class="summary" id="complete-summary"></div>
         <button class="redeploy-button" id="redeploy-button">Redeploy</button>
       </div>
     `;
@@ -183,6 +212,8 @@ export class Hud {
     this.extractProgress = root.querySelector<HTMLDivElement>("#extract-fill")!;
     this.extractLabel = root.querySelector<HTMLDivElement>("#extract-label")!;
     this.completeOverlay = root.querySelector<HTMLDivElement>("#complete-overlay")!;
+    this.completeSummary = root.querySelector<HTMLDivElement>("#complete-summary")!;
+    this.lootCount = root.querySelector<HTMLDivElement>("#loot-count-value")!;
 
     root.querySelector<HTMLButtonElement>("#redeploy-button")!.addEventListener("click", onRedeploy);
   }
@@ -201,9 +232,14 @@ export class Hud {
     this.extractLabel.textContent = state === "extracting" ? "Extracting..." : "Hold [E] to Extract";
   }
 
-  showExtractionComplete() {
+  setLootCount(count: number) {
+    this.lootCount.textContent = String(count);
+  }
+
+  showExtractionComplete(gained: number, totalBanked: number) {
     this.completeOverlay.classList.add("visible");
     this.extractPrompt.classList.remove("visible");
+    this.completeSummary.innerHTML = `+<span class="gained">${gained}</span> Salvage &middot; ${totalBanked} Banked`;
     this.extractionComplete = true;
     this.refreshLockPrompt();
   }

@@ -12,8 +12,15 @@ import { scatterVegetation } from "../world/Vegetation";
 import { PlayerController } from "../player/PlayerController";
 import { Hud, type ExtractionPromptState } from "../ui/hud";
 import { ExtractionZone } from "../gameplay/ExtractionZone";
+import { LootField } from "../gameplay/Loot";
 
 const EXTRACT_HOLD_SECONDS = 3;
+const BANKED_LOOT_KEY = "outfall.bankedLoot";
+
+function loadBankedLoot(): number {
+  const stored = Number(localStorage.getItem(BANKED_LOOT_KEY));
+  return Number.isFinite(stored) ? stored : 0;
+}
 
 export class Game {
   private engine: Engine;
@@ -45,26 +52,39 @@ export class Game {
     const zoneX = 90;
     const zoneZ = -70;
     const zone = new ExtractionZone(this.scene, new Vector3(zoneX, heightAt(zoneX, zoneZ), zoneZ));
+    const lootField = new LootField(this.scene, [{ x: spawnX, z: spawnZ, radius: 14 }]);
 
     let extractionProgress = 0;
     let extracted = false;
+    let currentLoot = 0;
+    let bankedLoot = loadBankedLoot();
 
     const redeploy = () => {
       player.teleport(spawn);
       player.setInputEnabled(true);
       extracted = false;
       extractionProgress = 0;
+      currentLoot = 0;
+      hud.setLootCount(currentLoot);
       hud.hideExtractionComplete();
     };
 
     const hud = new Hud(hudRoot, player, redeploy);
+    hud.setLootCount(currentLoot);
 
     this.scene.onBeforeRenderObservable.add(() => {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.1);
       zone.update(dt);
+      lootField.update(dt);
       hud.setStamina(player.getStamina());
 
       if (extracted) return;
+
+      const gained = lootField.collect(player.camera.position);
+      if (gained > 0) {
+        currentLoot += gained;
+        hud.setLootCount(currentLoot);
+      }
 
       const inside = zone.isInside(player.camera.position);
       const holding = inside && player.isKeyDown("KeyE");
@@ -77,13 +97,15 @@ export class Game {
       if (extractionProgress >= 1) {
         extracted = true;
         player.setInputEnabled(false);
-        hud.showExtractionComplete();
+        bankedLoot += currentLoot;
+        localStorage.setItem(BANKED_LOOT_KEY, String(bankedLoot));
+        hud.showExtractionComplete(currentLoot, bankedLoot);
         document.exitPointerLock();
       }
     });
 
     if (import.meta.env.DEV) {
-      (window as unknown as Record<string, unknown>).__debug = { scene: this.scene, engine: this.engine, player, zone };
+      (window as unknown as Record<string, unknown>).__debug = { scene: this.scene, engine: this.engine, player, zone, lootField };
     }
 
     this.engine.runRenderLoop(() => this.scene.render());
